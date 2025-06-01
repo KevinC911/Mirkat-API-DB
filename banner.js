@@ -28,8 +28,9 @@ router.post('/add', validateToken, imageUpload.array("image"), (req, res) => {
 
     const imagePath = req.files.map(file => file.path).join(',');
 
+    const title = req.body.title;
 
-    db.get('INSERT INTO banners (image_path) VALUES (?) RETURNING id', [imagePath], (err, row) => {
+    db.get('INSERT INTO banners (image_path, title) VALUES (?, ?) RETURNING id', [imagePath, title], (err, row) => {
         if (err) {
             console.error(err.message);
             return res.status(500).json({ error: 'Internal server error' });

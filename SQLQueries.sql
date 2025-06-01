@@ -18,6 +18,8 @@ CREATE TABLE banners (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     image_path TEXT,
     id_news INTEGER,
+    title TEXT,
+    subtitle TEXT,
     FOREIGN KEY (id_news) REFERENCES news(id) ON DELETE CASCADE
 );
 
