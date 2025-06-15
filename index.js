@@ -13,10 +13,12 @@ const port = 3000;
 var auth = require('./auth.js');
 var news = require('./news.js');
 var banner = require('./banner.js');
+var achievements = require('./achievements.js');
 
 app.use('/auth', auth);
 app.use('/news', news);
 app.use('/banner', banner);
+app.use('/achievements', achievements);
 
 app.get('/serve/:filename', async (req, res) => {
     const filename = req.params.filename;

@@ -1,10 +1,8 @@
 var express = require('express');
 const app = express()
-const jwt = require('jsonwebtoken');
 var router = express.Router();
 const db  = require('./db.js');
 const multer = require('multer');
-const path = require('path');
 require('dotenv').config();
 const imageUploadPath = '\images';
 const validateToken = require('./validatetoken.js');

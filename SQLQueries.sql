@@ -23,3 +23,9 @@ CREATE TABLE banners (
     FOREIGN KEY (id_news) REFERENCES news(id) ON DELETE CASCADE
 );
 
+CREATE TABLE achievements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT,
+    image_path TEXT
+);
+
