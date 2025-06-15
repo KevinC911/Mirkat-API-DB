@@ -25,6 +25,7 @@ CREATE TABLE banners (
 
 CREATE TABLE achievements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    number TEXT,
     content TEXT,
     image_path TEXT
 );

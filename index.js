@@ -22,6 +22,8 @@ app.use('/achievements', achievements);
 
 app.get('/serve/:filename', async (req, res) => {
     const filename = req.params.filename;
+    const width = parseInt(req.query.width) || 1920;
+    const quality = parseInt(req.query.quality) || 80;
 
     try {
     const imagePath = path.join(__dirname, filename);
@@ -29,7 +31,11 @@ app.get('/serve/:filename', async (req, res) => {
     res.set('Content-Type', 'image/webp');
 
     const resizedImage = await sharp(imagePath)
-    .webp({ quality: 75 })
+    .webp({ quality: quality })
+    .resize({
+        width: width,
+        withoutEnlargement: true
+    })
     .toBuffer();
 
     res.send(resizedImage);

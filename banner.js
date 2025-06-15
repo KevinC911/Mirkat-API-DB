@@ -76,7 +76,6 @@ router.post('/add/id', validateToken, (req, res) => {
         }
 
         db.run('UPDATE banners SET id_news = ? WHERE id = ?', [newsID, id], (err) => {
-            console.log('valid3')
             if (err) {
                 console.error(err.message);
                 return res.status(500).json({ error: 'Internal server error' });

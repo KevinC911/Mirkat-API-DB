@@ -23,9 +23,9 @@ const imageUpload = multer({storage: storage});
 router.post('/add', validateToken, imageUpload.array("image"), (req, res) => {
     const imagePath = req.files.map(file => file.path).join(',');
 
-    const content = req.body.content;
+    const {number, content} = req.body;
 
-    db.run('INSERT INTO achievements (content, image_path) VALUES (?, ?)', [content, imagePath], (err) => {
+    db.run('INSERT INTO achievements (number, content, image_path) VALUES (?, ?, ?)', [number, content, imagePath], (err) => {
         if (err) {
             return res.status(500).json({ error: 'Internal server error' });
         }
