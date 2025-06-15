@@ -13,6 +13,7 @@ dist-ssr
 .env
 images
 images-news
+images-numbers
 *.local
 
 # Editor directories and files
