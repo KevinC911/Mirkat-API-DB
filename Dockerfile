@@ -6,7 +6,5 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN mkdir /app/images
-RUN mkdir /app/images-news
 EXPOSE 3000
 CMD ["node", "index.js"]
