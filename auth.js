@@ -36,52 +36,51 @@ router.get('/validate', (req, res) => {
     
 
 router.post('/register', async (req, res) => {
-    const { username, password, email } = req.body;
-    
-    db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
-        if (err) {
-            console.error(err.message);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        if (user) {
-            return res.status(409).json({ error: 'Username already exists' });
-        }
+    const { username, password } = req.body;
 
-        const encryptedPassword = await hashPassword(password);
-        
-        db.run('INSERT INTO users (username, password, email) VALUES (?, ?, ?)', [username, encryptedPassword, email], (err)  => {
-            if (err) {
-                console.error(err.message);
-                return res.status(500).json({ error: 'Internal server error' });
-            }
-            res.status(201).json({ message: 'User registered successfully!' });
-        });
-    });
+    const snapshot = await db.collection('users')
+    .where('username', '==', username).get();
+
+    if (!snapshot) {
+        return res.status(400).json({ error: 'Username already exists'});
+    }
+
+    const encryptedPassword = await hashPassword(password);
+
+    await db.collection('users').add({
+        username: username,
+        password: encryptedPassword
+    }).then(() => {
+        res.status(201).json({ message: 'User registered successfully!' });
+    }).catch((error) => {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    })
+
 }
 );
 
 
 router.post('/login', async (req, res) => {
     const { identifier , password} = req.body;
-    
-    db.get('SELECT * FROM users WHERE username = ? OR email = ?', [ identifier, identifier ], async (err, user) => {
-        if (err) { 
-            console.error(err.message);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        if (!user) {
-            return res.status(401).json({ error: 'Invalid username or password' });
-        }
 
-        const isValid = await bcrypt.compare(password, user.password);
-        if (!isValid) {
+    const snapshot = await db.collection('users')
+    .where('username', '==', identifier).get();
+
+    if (!snapshot) {
+        console.log('Invalid username');
+        return res.status(400).json({ error: 'Invalid username' });
+    }
+
+    const isValid = await bcrypt.compare(password, snapshot.docs[0].data().password);
+
+    if (!isValid) {
             return res.status(401).json({ error: 'Invalid password' });
         } else {
-            const accessToken = generateAccessToken(user);
+            const accessToken = generateAccessToken({id: snapshot.docs[0].id, ...snapshot.docs[0].data()});
             res.status(200).json({ token: accessToken });
         }
-    }
-)
+
 });
 
 module.exports = router;

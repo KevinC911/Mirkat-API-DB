@@ -1,12 +1,12 @@
-const sqlite = require('sqlite3').verbose();
+const admin = require('firebase-admin');
 require('dotenv').config();
 
-const db = new sqlite.Database(`./db/${process.env.DB_NAME}`, (err) => {
-    if (err) {
-        console.error('Error opening database ' + err.message);
-    } else {
-        console.log('Connected to the SQLite database.');
-    }
+const serviceAccount = JSON.parse(process.env.AUTH_FIRESTORE_JSON);
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
 });
+
+var db = admin.firestore();
 
 module.exports = db;

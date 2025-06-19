@@ -2,108 +2,98 @@ var express = require('express');
 const app = express()
 var router = express.Router();
 const db  = require('./db.js');
-const multer = require('multer');
+const multer = require('./multerConf.js');
 require('dotenv').config();
-const imageUploadPath = '\images';
+const bucket = require('./cloudStorageConf.js');
 const validateToken = require('./validatetoken.js');
 
-app.use(express.json({limit: '50mb'}));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json());
+app.use(express.urlencoded());
 
-
-const storage = multer.diskStorage({
-    destination: function(req, file, cb) {
-      cb(null, imageUploadPath)
-    },
-    filename: function(req, file, cb) {
-      cb(null, `${file.fieldname}_dateVal_${Date.now()}_${file.originalname}`)
-    }
-  });
-
-const imageUpload = multer({storage: storage});
-
-router.post('/add', validateToken, imageUpload.array("image"), (req, res) => {
-
-    const imagePath = req.files.map(file => file.path).join(',');
+router.post('/add', validateToken, multer.single("image"), async (req, res) => {
 
     const title = req.body.title;
+    var newsId = req.body.newsId;
 
-    db.get('INSERT INTO banners (image_path, title) VALUES (?, ?) RETURNING id', [imagePath, title], (err, row) => {
-        if (err) {
-            console.error(err.message);
-            return res.status(500).json({ error: 'Internal server error' });
+    const file = req.file;
+
+    if (newsId !== '') {
+        const newsRef = await db.collection('news').doc(newsId).get();
+
+        if (!newsRef.exists) {
+            newsId = null;
         }
-
-        return res.status(200).json({
-            id: row.id,
-            message: "Image uploaded successfully"
-        })
-    });
-
-
-
-});
-
-router.post('/add/id', validateToken, (req, res) => {
-
-    let newsID = req.body.newsid;
-    const id = req.body.id;
-    if (newsID === undefined || newsID === 0) {
-        newsID = null;
+    } else {
+        newsId = null;
     }
 
-    db.get('SELECT * FROM news WHERE id = ?', [newsID], (err, row) => {
-        if (err) {
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        
-        if (!newsID) {
-            console.log('newsID is null or 0, skipping news check');
-        } 
-        
-        if (!row && newsID !== null) {
-            let flag = false;
-            db.run('DELETE FROM banners WHERE id = ?', [id], (err) => {
-                if (err){
-                    flag = true;
-                }          
-            });
-            if (flag) {
-                return res.status(500).json({ error: 'Internal server error' })
-            }
-            return res.status(404).json({ error: 'News not found' });   
-            
-        }
+    try {
+        const filename = `banner-img/${Date.now()}_${file.originalname}`;
+        const blob = bucket.file(filename);
 
-        db.run('UPDATE banners SET id_news = ? WHERE id = ?', [newsID, id], (err) => {
-            if (err) {
-                console.error(err.message);
-                return res.status(500).json({ error: 'Internal server error' });
+        
+        const blobStream = blob.createWriteStream({
+            resumable: false,
+            metadata: {
+                contentType: req.file.mimetype
             }
-            return res.status(200).json({ message: 'Banner updated successfully!' });
         });
-    });  
+
+        blobStream.on('error', (err) => {
+            console.error('Error uploading image:', err);
+        });
+
+        blobStream.on('finish', () => {
+
+            db.collection('banners').add({
+                title: title,
+                image_path: filename,
+                id_news: newsId
+            });
+        });
+
+        blobStream.end(file.buffer);
+
+        return res.status(200).json({ message: 'Image uploaded succesfully'});
+    } catch (error) {
+        console.error('Error processing image:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+
 });
 
 router.get('/get/all', (req, res) => {
-    db.all('SELECT * FROM banners', [], (err, banners) => {
-        if (err) {
-            console.error(err.message);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        return res.status(200).json(banners);
+    var data = [];
+
+    db.collection('banners').get()
+    .then((snapshot) => {
+        snapshot.forEach(doc => {
+            data.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        return res.status(200).json(data);
     });
+
+    
 });
 
-router.delete('/delete/:id', validateToken, (req, res) => {
+router.delete('/delete/:id', validateToken, async (req, res) => {
     const id = req.params.id;
-    db.run('DELETE FROM banners WHERE id = ?', [id], (err) => {
-        if (err) {
-            console.error(err.message);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        return res.status(200).json({ message: 'Banner deleted successfully' });
-    });
+    const doc = await db.collection('banners').doc(id).get();
+    if (!doc.exists) {
+        return res.status(404).json({ error: 'Banner not found' });
+    }
+
+    try {
+        await db.collection('banners').doc(id).delete();
+        await bucket.file(doc.data().image_path).delete();
+        return res.status(200).json({ message: 'Banner deleted' });
+    } catch (err) {
+        console.error('Error deleting banner:', err);
+        return res.status(500).json({ error: 'Interal server error'});
+    }
 });
 
 module.exports = router;
