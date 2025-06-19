@@ -2,55 +2,85 @@ var express = require('express');
 const app = express()
 var router = express.Router();
 const db  = require('./db.js');
-const multer = require('multer');
-const imageUploadPath = '\images-numbers';
+const multer = require('./multerConf.js');
+require('dotenv').config();
+const bucket = require('./cloudStorageConf.js');
 const validateToken = require('./validatetoken.js');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const storage = multer.diskStorage({
-    destination: function(req, file, cb) {
-      cb(null, imageUploadPath)
-    },
-    filename: function(req, file, cb) {
-      cb(null, `${file.fieldname}_dateVal_${Date.now()}_${file.originalname}`)
-    }
-  });
-
-const imageUpload = multer({storage: storage});
-
-router.post('/add', validateToken, imageUpload.array("image"), (req, res) => {
-    const imagePath = req.files.map(file => file.path).join(',');
+router.post('/add', validateToken, multer.single("image"), (req, res) => {
 
     const {number, content} = req.body;
+    const file = req.file;
 
-    db.run('INSERT INTO achievements (number, content, image_path) VALUES (?, ?, ?)', [number, content, imagePath], (err) => {
-        if (err) {
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        return res.status(200).json({ message: 'Achievement added' });
-    }) 
+     try {
+        const filename = `achivem-img/${Date.now()}_${file.originalname}`;
+        
+        const blob = bucket.file(filename);
+        const blobStream = blob.createWriteStream({
+            resumable: false,
+            metadata: {
+                contentType: file.mimetype
+            }
+        });
+
+        blobStream.on('error', (err) => {
+            console.error('Error uploading image:', err);
+            return res.status(500).json({ error: 'Internal server error'});
+        });
+
+        blobStream.on('finish', () => {
+
+            db.collection('achievements').add({
+                number: number,
+                content: content,
+                image_path: filename
+            });
+        });
+
+        blobStream.end(file.buffer);
+        return res.status(200).json({ message: 'Image uploaded succesfully'});
+    } catch (error) {
+        console.error('Error processing image:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
 })
 
-router.delete('/delete/:id', validateToken, (req, res) => {
+router.delete('/delete/:id', validateToken, async (req, res) => {
     const id = req.params.id;
 
-    db.run('DELETE FROM achievements WHERE id = ?', [id], (err) => {
-        if (err) {
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        return res.status(200).json({ message: 'Achievement deleted successfully!' });
-    });
+    const doc = await db.collection('achievements').doc(id).get();
+    if (!doc.exists) {
+        return res.status(404).json({ error: 'Achievement not found' });
+    }
+
+    try {
+        await db.collection('achievements').doc(id).delete();
+        await bucket.file(doc.data().image_path).delete();
+        return res.status(200).json({ message: 'Achievement deleted' });
+    } catch (err) {
+        console.error('Error deleting achievement:', err);
+        return res.status(500).json({ error: 'Interal server error'});
+    }
 })
 
-router.get('/get/all', (req, res) => {
-    db.all('SELECT * FROM achievements', [], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        return res.status(200).json(rows);
+router.get('/get/all', async (req, res) => {
+    var data = [];
+
+    await db.collection('achievements').get()
+    .then((snapshot) => {
+        snapshot.forEach(doc => {
+            data.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        return res.status(200).json(data);
     });
+
+
 });
 
 module.exports = router;

@@ -1,12 +1,7 @@
-const sqlite = require('sqlite3').verbose();
-require('dotenv').config();
+const admin = require('firebase-admin');
 
-const db = new sqlite.Database(`./db/${process.env.DB_NAME}`, (err) => {
-    if (err) {
-        console.error('Error opening database ' + err.message);
-    } else {
-        console.log('Connected to the SQLite database.');
-    }
-});
+admin.initializeApp();
+
+var db = admin.firestore();
 
 module.exports = db;
