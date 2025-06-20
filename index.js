@@ -3,13 +3,7 @@ const app = express();
 const cors = require('cors');
 const path = require('path');
 const sharp = require('sharp');
-const corsOptions = {
-    origin: 'https://mirkat-frontend-416591638545.us-west1.run.app/',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
-    optionsSuccessStatus: 204 // For legacy browser support
-}
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/', express.static(path.join(__dirname, '')));
